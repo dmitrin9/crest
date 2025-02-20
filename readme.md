@@ -1,1 +1,1 @@
-crawl all links on your site to test that all endpoints work and don't return status errors.
+Crawl all anchor tags on your site to test if any URLs return status errors when requested. 

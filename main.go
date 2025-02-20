@@ -3,11 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"strings"
+
+	"golang.org/x/net/html"
 )
 
 const (
@@ -16,15 +16,7 @@ const (
 	STATUS_ERROR      = "STATUS ERROR!"
 )
 
-func getLinks(res) []string {
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
-	n, err := html.Parse(strings.NewReader(string(body)))
-	if err != nil {
-		return err
-	}
+func getLinks(n *html.Node) []string {
 
 	var links []string
 	if n.Type == html.ElementNode && n.Data == "a" {
@@ -40,18 +32,18 @@ func getLinks(res) []string {
 	return links
 }
 
-func page(url string) (*Response, error) {
+func page(url string) (*http.Response, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	res, err := client.Do(req)
-	defer res.Body.Close()
+	//defer res.Body.Close()
 	if err != nil {
 		return nil, err
 	}
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		return nil, errors.New(fmt.Sprintf("%s in %s | STATUS: %d", STATUS_ERROR, url, res.StatusCode))
 	}
 
@@ -79,7 +71,25 @@ func handle() error {
 				return errors.New(PROTOCOL_REQUIRED)
 			}
 
-			page(url)
+			base_res, err := page(url)
+			if err != nil {
+				return err
+			}
+			node, err := html.Parse(base_res.Body)
+			if err != nil {
+				return err
+			}
+			links := getLinks(node)
+			for i := range links {
+				r, err := page(url + links[i])
+				if err != nil {
+					fmt.Println(fmt.Sprintf("QUITTED ON LINK %d of %d TOTAL LINKS", i, len(links)))
+					return err
+				}
+				r.Body.Close()
+			}
+			base_res.Body.Close()
+			fmt.Println("ALL LINKS PASSED!")
 		}
 	}
 	return nil
