@@ -3,9 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 const (
@@ -14,22 +16,46 @@ const (
 	STATUS_ERROR      = "STATUS ERROR!"
 )
 
-func page(url string) error {
+func getLinks(res) []string {
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	n, err := html.Parse(strings.NewReader(string(body)))
+	if err != nil {
+		return err
+	}
+
+	var links []string
+	if n.Type == html.ElementNode && n.Data == "a" {
+		for _, attr := range n.Attr {
+			if attr.Key == "href" {
+				links = append(links, attr.Val)
+			}
+		}
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		links = append(links, getLinks(c)...)
+	}
+	return links
+}
+
+func page(url string) (*Response, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	res, err := client.Do(req)
 	defer res.Body.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if res.StatusCode != 200 {
-		return errors.New(fmt.Sprintf("%s in %s | STATUS: %d", STATUS_ERROR, url, res.StatusCode))
+		return nil, errors.New(fmt.Sprintf("%s in %s | STATUS: %d", STATUS_ERROR, url, res.StatusCode))
 	}
 
-	return nil
+	return res, nil
 }
 
 func handle() error {
@@ -50,9 +76,9 @@ func handle() error {
 
 			url := args[len(args)-1]
 			if url[0:7] != "http://" && url[0:8] != "https://" {
-				fmt.Println(url[0:7])
 				return errors.New(PROTOCOL_REQUIRED)
 			}
+
 			page(url)
 		}
 	}
