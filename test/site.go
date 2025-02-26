@@ -41,6 +41,40 @@ func run() error {
 
 	})
 
+	http.HandleFunc("/AnotherWorkingSite", func(w http.ResponseWriter, r *http.Request) {
+		tmpl, err := template.ParseFiles("views/AnotherWorkingSite.html")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Println("Template Initialized.")
+
+		err = tmpl.Execute(w, nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Println("Template Executed.")
+
+	})
+
+	http.HandleFunc("/DoesNotExist", func(w http.ResponseWriter, r *http.Request) {
+		tmpl, err := template.ParseFiles("views/DoesNotExist.html")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Println("Template Initialized.")
+
+		err = tmpl.Execute(w, nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Println("Template Executed.")
+
+	})
+
 	log.Println("serving 8080...")
 	return http.ListenAndServe(":8080", nil)
 }
