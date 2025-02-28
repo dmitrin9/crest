@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -18,6 +19,25 @@ const (
 	SCHEME_REQUIRED        = "All URL's must contain their scheme (http, https, etc...)"
 	STATUS_ERROR           = "STATUS ERROR!"
 )
+
+type Context struct {
+	quiet   bool
+	verbose bool
+}
+
+func (c *Context) printv(stream io.Writer, out string, longOut string) {
+	if c.verbose {
+		fmt.Fprintln(stream, longOut)
+	} else if c.quiet {
+		if stream == os.Stderr {
+			fmt.Fprintln(stream, out)
+			return
+		}
+		return
+	} else {
+		fmt.Fprintln(stream, out)
+	}
+}
 
 func splitUrl(raw string) map[string]string {
 	parsed, err := url.Parse(raw)
@@ -78,7 +98,32 @@ func page(url string) (*http.Response, error) {
 	return res, nil
 }
 
-func handle() error {
+func recursiveLinkCheck(url string, links []string, ctx Context, depth int) error {
+	newLinks := []string{}
+
+	for i := range links {
+		r, err := page(url + links[i])
+		if err != nil {
+			ctx.printv(os.Stderr, fmt.Sprintf("ERROR: Quitted at %s", links[i]), fmt.Sprintf("ERROR: Quitted at %s which is link %d of %d total links at link recursion depth %d", links[i], i, len(links), depth))
+			return err
+		}
+		ctx.printv(os.Stdout, "OK: Response open", fmt.Sprintf("OK: recursive response opened, depth %d", depth))
+		node, err := html.Parse(r.Body)
+		if err != nil {
+			ctx.printv(os.Stderr, "ERROR: Error getting nodes.", "ERROR: Error getting nodes from recursive response.")
+			return err
+		}
+		newLinks = append(newLinks, getLinks(node)...)
+		r.Body.Close()
+	}
+	if depth >= 20 {
+		return nil
+	}
+	return recursiveLinkCheck(url, newLinks, ctx, depth+1)
+
+}
+
+func handle(ctx Context) error {
 	args := os.Args
 
 	/*
@@ -92,14 +137,18 @@ func handle() error {
 		return errors.New(COMMAND_NOT_RECOGNIZED)
 	}
 
-	verbose := false
-
 	for i := range args {
 		if args[i] == "-v" || args[i] == "--verbose" {
 			if i == len(args)-1 {
 				return errors.New(FLAGS_PLACEMENT)
 			}
-			verbose = true
+			ctx.verbose = true
+		}
+		if args[i] == "-q" || args[i] == "--quiet" {
+			if i == len(args)-1 {
+				return errors.New(FLAGS_PLACEMENT)
+			}
+			ctx.quiet = true
 		}
 	}
 
@@ -118,49 +167,42 @@ func handle() error {
 				return errors.New(NON_LOCALHOST_CRAWL)
 
 			}
-			if verbose {
-				fmt.Println("OK: PROTOCOL DEFINED")
-			}
+
+			ctx.printv(os.Stdout, "OK: Scheme and host verified", "OK: Scheme is verified to be http or https, and host is verified to be localhost or 127.0.0.1")
 
 			base_res, err := page(url)
 			if err != nil {
 				return err
 			}
-			if verbose {
-				fmt.Println("OK: BASE PAGE RESPONSE")
-			}
+			ctx.printv(os.Stdout, "OK: Base page response", "OK: Response of the base link "+url+" has been created.")
+
 			node, err := html.Parse(base_res.Body)
 			if err != nil {
 				return err
 			}
-			if verbose {
-				fmt.Println("OK: HTML NODES FOR BASE RESPONSE")
-			}
+			ctx.printv(os.Stdout, "OK: HTML Nodes", "OK: Acquired HTML nodes from base page response.")
+
 			links := getLinks(node)
-			for i := range links {
-				r, err := page(url + links[i])
-				if err != nil {
-					fmt.Println(fmt.Sprintf("ERROR: QUITTED ON LINK %d of %d TOTAL LINKS", i, len(links)))
-					return err
-				}
-				if verbose {
-					fmt.Println(fmt.Sprintf("OK: PAGE RESPONSE FOR NODE %d LINK %s", i+1, links[i]))
-				}
-				r.Body.Close()
-				if verbose {
-					fmt.Println("OK: CLOSED LINK RESPONSE")
-				}
+			if err = recursiveLinkCheck(url, links, ctx, 0); err != nil {
+				return err
 			}
+
+			ctx.printv(os.Stdout, "OK: Get links", "OK: Recursive link check done")
 			base_res.Body.Close()
-			if verbose {
-				fmt.Println("OK: CLOSED BASE RESPONSE")
-			}
-			fmt.Println("ALL CHECKS PASSED")
+
+			ctx.printv(os.Stdout, "OK: Response closed", "OK: Base response closed")
+			ctx.printv(os.Stdout, "OK: Complete", "OK: Complete")
 		}
 	}
 	return nil
 }
 
 func main() {
-	log.Fatal(handle())
+	ctx := Context{
+		verbose: false,
+		quiet:   false,
+	}
+	if err := handle(ctx); err != nil {
+		log.Fatal(err)
+	}
 }
