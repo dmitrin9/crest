@@ -50,6 +50,7 @@ func splitUrl(raw string) map[string]string {
 	urlStructure["scheme"] = parsed.Scheme
 	urlStructure["hostname"] = parsed.Hostname()
 	urlStructure["path"] = parsed.Path
+	urlStructure["fragment"] = parsed.Fragment
 
 	return urlStructure
 }
@@ -67,7 +68,7 @@ func getLinks(n *html.Node) []string {
 					}
 				*/
 				urlStructure := splitUrl(link)
-				if urlStructure["hostname"] == "" {
+				if urlStructure["hostname"] == "" && urlStructure["scheme"] == "" && urlStructure["fragment"] == "" {
 					links = append(links, link)
 				}
 			}
