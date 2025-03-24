@@ -1,5 +1,5 @@
 ## crest
-Crawl all anchor tags on your site to test if any URLs return status errors when requested. 
+Very basic static page testing for small personal sites.
 
 ---
 
@@ -17,3 +17,9 @@ crest -q/--quiet -t/--test-http http://localhost:8080 # The quiet flag will prin
 <br>
 Make sure to specify scheme in your URL. Only HTTP/HTTPS is recognized. Make sure that your host is localhost: if you try to crawl a site that is not localhost you will recieve an error, but one of your pages links to another site it will simply be skipped. <br>
 The design philosophy of crest is permissive but contained. Meaning, it will by default crawl everything unless specificied otherwise, but it will make sure only to crawl your site. Most features that will be added to crest will follow that general idea.
+<br>
+If you want to track your robots.txt policy, include your policy under `Crestbot` user agent in the robots.txt file, and when you run your crest command run it with the `--follow-robots` flag.
+<br>
+If you want to exclude a specific path from being crawled, run with `--exclude="/foo"` flag.
+<br>
+An example of what it would look like if you combined all this together: `crest --verbose --exclude="foo" --follow-robots --test-http https://localhost:8080`

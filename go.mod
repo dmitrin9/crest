@@ -1,4 +1,4 @@
-module module
+module github.com/dmitya26/crest
 
 go 1.23.6
 

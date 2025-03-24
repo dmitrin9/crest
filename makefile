@@ -7,9 +7,12 @@ build:
 	go build -o $(DEST_PATH) *.go
 	@echo "Successfully built crest"
 
-install: 
-	install -m 755 $(DEST_PATH) $(INSTALL_PATH)	
+install:
+	install -m 755 $(DEST_PATH) $(INSTALL_PATH)
 	@echo "Installed crest to your install path"
+
+test:
+	go test crest_test.go crest.go
 
 clean:
 	rm -f ./bin/*

@@ -1,0 +1,8 @@
+User-agent: Crestbot
+Disallow: /DoesNotExist
+
+User-agent: *
+Disallow: /
+
+User-agent: Anotherbot
+Allow: works
