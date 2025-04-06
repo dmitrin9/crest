@@ -1,0 +1,16 @@
+url  = "http://localhost:8080"
+path = CURRENT
+
+toExclude = "hello"
+anotherToExclude = "hello/world"
+toHook = "foo"
+
+type testHTTP
+
+verbose      true
+followRobots true
+
+exclude {toExclude}
+exclude {anotherToExclude}
+
+hook {toHook} `some-unrelated-tool {url}{path}`

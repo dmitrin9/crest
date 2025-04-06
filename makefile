@@ -12,7 +12,7 @@ install:
 	@echo "Installed crest to your install path"
 
 test:
-	go test crest_test.go crest.go
+	go test -v crest_test.go crest.go compiler.go
 
 clean:
 	rm -f ./bin/*

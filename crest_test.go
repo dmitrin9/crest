@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"sync"
 	"testing"
+	"text/template"
 )
 
 const workdir = "/home/dmitri/repos/crawl-tester/"
@@ -22,6 +22,22 @@ func command(args []string, ctx *Context) {
 	err := Handle(args, ctx)
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func printTheThing(arg []LexNode) {
+	for i := range arg {
+		if arg[i].tok_raw != "" {
+			fmt.Print(arg[i].tok_raw, ": ", arg[i])
+			fmt.Println()
+		}
+	}
+	fmt.Println("--------------------------")
+	for i := range arg {
+		if arg[i].tok_raw != "" {
+			fmt.Print(arg[i].tok_raw)
+			fmt.Println()
+		}
 	}
 }
 
@@ -92,4 +108,49 @@ func TestHttpCrawlingFlags(t *testing.T) {
 
 	srv.Close()
 	wg.Wait()
+}
+
+func TestParse(t *testing.T) {
+	var s State
+	var err error
+
+	raw, err := os.ReadFile("views/Crestfile")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	data := string(raw)
+	s.raw = data
+
+	fmt.Println("TEST PRINT LEXER: ")
+	err = s.Lexer()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	printTheThing(s.lexNodes)
+
+	fmt.Println("-----------------------------------")
+
+	fmt.Println("TEST PRINT PARSER: ")
+	CURRENT_PATH := "/"
+	HTML_CONTENT := "<h1>Hello</h1>"
+	s.CURRENT_PATH = CURRENT_PATH
+	s.HTML_CONTENT = HTML_CONTENT
+	err = s.Parser()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	fmt.Println(s.parserNodes)
+
+	fmt.Println("-----------------------------------")
+	fmt.Println("TEST PRINT COMPILER: ")
+	err = s.Compiler()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	fmt.Println("VARIABLES: ", s.variable)
+	fmt.Println("INSTRUCTION SET: ")
+	for i := 2; i < len(s.instructionSet); i += 2 {
+		fmt.Println(s.instructionSet[i], " ", s.instructionSet[i-1])
+	}
+
 }
