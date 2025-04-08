@@ -32,12 +32,17 @@ func printTheThing(arg []LexNode) {
 			fmt.Println()
 		}
 	}
-	fmt.Println("--------------------------")
 	for i := range arg {
 		if arg[i].tok_raw != "" {
 			fmt.Print(arg[i].tok_raw)
 			fmt.Println()
 		}
+	}
+}
+
+func printHooks(hooks map[string]string) {
+	for key, value := range hooks {
+		fmt.Println(key, " ", value)
 	}
 }
 
@@ -128,20 +133,13 @@ func TestParse(t *testing.T) {
 	}
 	printTheThing(s.lexNodes)
 
-	fmt.Println("-----------------------------------")
-
-	fmt.Println("TEST PRINT PARSER: ")
-	CURRENT_PATH := "/"
-	HTML_CONTENT := "<h1>Hello</h1>"
-	s.CURRENT_PATH = CURRENT_PATH
-	s.HTML_CONTENT = HTML_CONTENT
+	fmt.Println("test print parser: ")
 	err = s.Parser()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	fmt.Println(s.parserNodes)
 
-	fmt.Println("-----------------------------------")
 	fmt.Println("TEST PRINT COMPILER: ")
 	err = s.Compiler()
 	if err != nil {
@@ -149,8 +147,40 @@ func TestParse(t *testing.T) {
 	}
 	fmt.Println("VARIABLES: ", s.variable)
 	fmt.Println("INSTRUCTION SET: ")
-	for i := 2; i < len(s.instructionSet); i += 2 {
-		fmt.Println(s.instructionSet[i], " ", s.instructionSet[i-1])
+	for i := 0; i < len(s.instructionSet)-2; i += 2 {
+		fmt.Println(s.instructionSet[i], " ", s.instructionSet[i+1])
 	}
 
+}
+
+func TestCrestfileHandler(t *testing.T) {
+	args := []string{"crest", "run", "views/Crestfile"}
+
+	ctx := Context{
+		verbose:      false,
+		quiet:        false,
+		followRobots: false,
+		hooks:        make(map[string]string),
+
+		exclude: []string{},
+	}
+	s := State{
+		raw:         "",
+		lexNodes:    []LexNode{},
+		parserNodes: []ParserNode{},
+
+		variable:       make(map[string]string),
+		hooks:          make(map[string]string),
+		instructionSet: []string{},
+
+		offset: 0,
+		row:    0,
+		col:    0,
+	}
+
+	if err := HandleFile(args, &s, &ctx); err != nil {
+		t.Fatalf("%v", err)
+	}
+	fmt.Println("Hooks")
+	printHooks(ctx.hooks)
 }

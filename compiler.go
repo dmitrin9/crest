@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 var TOKS map[string]string = map[string]string{
@@ -15,6 +16,7 @@ var TOKS map[string]string = map[string]string{
 	"verbose":      "SET",
 	"followRobots": "SET",
 	"type":         "SET",
+	"url":          "SET",
 	"testHTTP":     "TEST_TYPE",
 }
 
@@ -66,9 +68,6 @@ type ParserNode struct {
 }
 
 type State struct {
-	CURRENT_PATH string
-	HTML_CONTENT string
-
 	raw         string
 	lexNodes    []LexNode
 	parserNodes []ParserNode
@@ -76,6 +75,7 @@ type State struct {
 	variable map[string]string
 
 	instructionSet []string
+	hooks          map[string]string
 
 	offset int
 	row    int
@@ -173,10 +173,10 @@ func (s *State) Parser() error {
 		}
 		if c.tok_type == "HOOK" {
 			node.operation = "Hook"
-			if i < len(tokens)-2 {
-				pattern := tokens[i+1]
+			if i < len(tokens)-1 {
+				path := tokens[i+1]
 				code := tokens[i+2]
-				node.operands = []LexNode{pattern, code}
+				node.operands = []LexNode{path, code}
 			} else {
 				return s.parseError("Hook failed because hook keyword is in an invalid location", node.operation)
 			}
@@ -202,6 +202,27 @@ func (s *State) Parser() error {
 	return nil
 }
 
+func (s *State) compileCode(codeblock string) string {
+	re := regexp.MustCompile("\\s")
+	split := re.Split(strings.TrimSpace(codeblock), -1)
+	for i, c := range split {
+		if c[0] == '{' && c[len(c)-1] == '}' {
+			value := ""
+			variable := c[1 : len(c)-1]
+			if variable == "CURRENT" {
+				value = "CURRENT"
+			} else if variable == "CONTENT" {
+				value = "CONTENT"
+			} else {
+				value = s.variable[variable]
+			}
+			split[i] = value
+		}
+	}
+	code := strings.Join(split, " ")
+	return code
+}
+
 func (s *State) Compiler() error {
 	/*
 	 * Compiles the parse nodes to a simple instruction set
@@ -211,6 +232,7 @@ func (s *State) Compiler() error {
 	 * in the crest.go file to generate a runtime.
 	 */
 	s.variable = make(map[string]string)
+	s.hooks = make(map[string]string)
 
 	for _, c := range s.parserNodes {
 		if c.operation == "Assignment" {
@@ -229,10 +251,10 @@ func (s *State) Compiler() error {
 				value = value[1 : len(value)-1]
 			}
 			if valueToken.tok_raw == "CURRENT" {
-				value = s.CURRENT_PATH
+				value = "CURRENT"
 			}
 			if valueToken.tok_raw == "CONTENT" {
-				value = s.HTML_CONTENT
+				value = "CONTENT"
 			}
 			s.variable[name] = value
 		}
@@ -246,12 +268,21 @@ func (s *State) Compiler() error {
 				s.compileError("Invalid type for set name", c.operation)
 			}
 			if valueToken.tok_type == "VARIABLE" {
+				variableValue := ""
 				rawVariable := valueToken.tok_raw[1 : len(valueToken.tok_raw)-1]
-				variableValue := s.variable[rawVariable]
-				if len(variableValue) <= 0 {
-					return s.compileError("Variable not found", c.operation)
+				if rawVariable == "CURRENT" {
+					variableValue = "CURRENT"
+				} else if rawVariable == "CONTENT" {
+					variableValue = "CONTENT"
+				} else {
+					variableValue = s.variable[rawVariable]
+					if len(variableValue) <= 0 {
+						return s.compileError("Variable not found", c.operation)
+					}
 				}
 				value = variableValue
+			} else if valueToken.tok_type == "CODE" {
+				value = s.compileCode(valueToken.tok_raw[1 : len(valueToken.tok_raw)-1])
 			} else if valueToken.tok_type == "STRING" {
 				value = valueToken.tok_raw[1 : len(valueToken.tok_raw)-1]
 			} else {
@@ -269,26 +300,27 @@ func (s *State) Compiler() error {
 			codeToken := c.operands[1]
 
 			if pathToken.tok_type == "VARIABLE" {
-				pathTokenVariable := pathToken.tok_type
+				pathTokenVariable := pathToken.tok_raw
 				pathTokenVariable = pathTokenVariable[1 : len(pathTokenVariable)-1]
 				path = s.variable[pathTokenVariable]
 			} else if pathToken.tok_type != "STRING" {
 				return s.compileError("Hook path must be type string", c.operation)
 			} else {
 				path = pathToken.tok_raw[1 : len(pathToken.tok_raw)-1]
-				s.instructionSet = append(s.instructionSet, path)
+				//s.instructionSet = append(s.instructionSet, path)
 			}
 
 			if codeToken.tok_type == "VARIABLE" {
-				codeTokenVariable := codeToken.tok_type
-				codeTokenVariable = codeTokenVariable[1 : len(codeTokenVariable)-1]
+				codeTokenVariable := codeToken.tok_raw
+				codeTokenVariable = s.compileCode(codeTokenVariable[1 : len(codeTokenVariable)-1])
 				code = s.variable[codeTokenVariable]
 			} else if codeToken.tok_type != "CODE" {
 				return s.compileError("Hook code must be type code", c.operation)
 			} else {
-				code = codeToken.tok_raw[1 : len(codeToken.tok_raw)-1]
-				s.instructionSet = append(s.instructionSet, code)
+				code = s.compileCode(codeToken.tok_raw[1 : len(codeToken.tok_raw)-1])
+				//s.instructionSet = append(s.instructionSet, code)
 			}
+			s.hooks[path] = code
 		}
 	}
 	return nil
