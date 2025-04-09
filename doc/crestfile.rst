@@ -23,12 +23,12 @@ How to write a crestfile ::
     hook {anotherWorkingSite} `echo Foo`
 
 In this code, the following happens:
-#. There is a variable for the path "/AnotherWorkingSite" defined as anotherWorkingSite.
-#. the URL to crawl is set to http://localhost:8080
-#. the type of testing is set to testHTTP.
-#. verbose is set to true, outputting the code in verbose mode. You can also use "quiet" for a quiet print.
-#. A hook is created which echo's "Hello" when "/" is crawled.
-#. Another hook is created which echos Foo when "/AnotherWorkingSite" is crawled.
+* There is a variable for the path "/AnotherWorkingSite" defined as anotherWorkingSite.
+* the URL to crawl is set to http://localhost:8080
+* the type of testing is set to testHTTP.
+* verbose is set to true, outputting the code in verbose mode. You can also use "quiet" for a quiet print.
+* A hook is created which echo's "Hello" when "/" is crawled.
+* Another hook is created which echos Foo when "/AnotherWorkingSite" is crawled.
 
 Notes
 =====
