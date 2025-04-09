@@ -14,6 +14,7 @@ var TOKS map[string]string = map[string]string{
 	"hook":         "HOOK",
 	"exclude":      "SET",
 	"verbose":      "SET",
+	"quiet":        "SET",
 	"followRobots": "SET",
 	"type":         "SET",
 	"url":          "SET",
@@ -270,15 +271,9 @@ func (s *State) Compiler() error {
 			if valueToken.tok_type == "VARIABLE" {
 				variableValue := ""
 				rawVariable := valueToken.tok_raw[1 : len(valueToken.tok_raw)-1]
-				if rawVariable == "CURRENT" {
-					variableValue = "CURRENT"
-				} else if rawVariable == "CONTENT" {
-					variableValue = "CONTENT"
-				} else {
-					variableValue = s.variable[rawVariable]
-					if len(variableValue) <= 0 {
-						return s.compileError("Variable not found", c.operation)
-					}
+				variableValue = s.variable[rawVariable]
+				if len(variableValue) <= 0 {
+					return s.compileError("Variable not found", c.operation)
 				}
 				value = variableValue
 			} else if valueToken.tok_type == "CODE" {
@@ -307,7 +302,6 @@ func (s *State) Compiler() error {
 				return s.compileError("Hook path must be type string", c.operation)
 			} else {
 				path = pathToken.tok_raw[1 : len(pathToken.tok_raw)-1]
-				//s.instructionSet = append(s.instructionSet, path)
 			}
 
 			if codeToken.tok_type == "VARIABLE" {
@@ -318,10 +312,10 @@ func (s *State) Compiler() error {
 				return s.compileError("Hook code must be type code", c.operation)
 			} else {
 				code = s.compileCode(codeToken.tok_raw[1 : len(codeToken.tok_raw)-1])
-				//s.instructionSet = append(s.instructionSet, code)
 			}
 			s.hooks[path] = code
 		}
+		fmt.Println(s.hooks)
 	}
 	return nil
 }

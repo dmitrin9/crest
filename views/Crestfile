@@ -1,13 +1,10 @@
-path      = CURRENT
 toExclude = "/DoesNotExist"
-toHook    = "/foo"
 anotherWorkingSite = "/AnotherWorkingSite"
 
-url          http://localhost:8080
-type         testHTTP
-verbose      true
-followRobots true
-exclude      {toExclude}
+url     http://localhost:8080
+type    testHTTP
+verbose true
+exclude {toExclude}
 
-hook {path} `echo World`
-hook "/AnotherWorkingSite" `echo Foo`
+hook "/" `echo Hello`
+hook {anotherWorkingSite} `echo World`

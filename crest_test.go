@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"sync"
 	"testing"
-	"text/template"
 )
 
 const workdir = "/home/dmitri/repos/crawl-tester/"
@@ -53,13 +53,13 @@ func handleHtml(route string, path string) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		log.Println("Template Initialized.")
+		log.Println("Template Initialized for " + path)
 		err = tmpl.Execute(w, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		log.Println("Template Executed.")
+		log.Println("Template Executed for " + path)
 
 	})
 }
@@ -183,4 +183,19 @@ func TestCrestfileHandler(t *testing.T) {
 	}
 	fmt.Println("Hooks")
 	printHooks(ctx.hooks)
+}
+
+func TestUtils(t *testing.T) {
+	ctx := Context{
+		verbose:      false,
+		quiet:        false,
+		followRobots: false,
+		hooks:        make(map[string]string),
+
+		exclude: []string{},
+	}
+	err := ctx.computeHook("echo Hello")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 }

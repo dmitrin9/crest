@@ -52,10 +52,15 @@ func (p *RobotPolicy) Empty() bool {
 
 func (c *Context) computeExcludedLinks(links []string) []string {
 	tmp := []string{}
-	for _, link := range links {
+	n := len(c.exclude)
+	if n == 0 {
+		tmp = append(tmp, links...)
+	} else {
 		for _, exclude := range c.exclude {
-			if link != exclude {
-				tmp = append(tmp, link)
+			for _, link := range links {
+				if link != exclude {
+					tmp = append(tmp, link)
+				}
 			}
 		}
 	}
@@ -72,7 +77,7 @@ func (c *Context) computeHook(hookCode string) error {
 		return err
 	}
 
-	fmt.Println(string(out))
+	c.printv(os.Stdout, string(out), "")
 
 	return nil
 }
@@ -281,24 +286,15 @@ func RecursiveLinkCheck(url string, links []string, ctx *Context, depth int) err
 	 * and by extension the entirety of crest.
 	 */
 	if depth == 0 {
-		if len(ctx.hooks) > 0 {
-			currentLink := splitUrl(url)["path"]
-			if len(currentLink) <= 0 {
-				currentLink = "/"
-			}
-			ctx.CURRENT = currentLink
-			for hookKey, hookValue := range ctx.hooks {
-				if hookKey == "CURRENT" {
-					if err := ctx.computeHook(hookValue); err != nil {
-						return err
-					}
-				}
-			}
-			hook := ctx.hooks[currentLink]
-			if len(hook) > 0 {
-				fmt.Println("hook is not current")
-				fmt.Println(hook)
-				if err := ctx.computeHook(hook); err != nil {
+		firstLink := splitUrl(url)["path"]
+		if firstLink == "" {
+			firstLink = "/"
+		}
+		hook := ctx.hooks[firstLink]
+		if depth == 0 {
+			if len(ctx.hooks) > 0 && len(firstLink) > 0 {
+				err := ctx.computeHook(hook)
+				if err != nil {
 					return err
 				}
 			}
@@ -332,26 +328,14 @@ func RecursiveLinkCheck(url string, links []string, ctx *Context, depth int) err
 
 	newLinks := []string{}
 	for i := range links {
-		ctx.CURRENT = links[i]
 		hook := ctx.hooks[links[i]]
-		fmt.Println("-------------")
-		fmt.Println(links[i])
-		fmt.Println(hook)
-		fmt.Println("-------------")
-		if len(ctx.hooks) > 0 {
-
-			if hook == "CURRENT" {
-				fmt.Println("CURRENT ", ctx.CURRENT)
-				if err := ctx.computeHook(ctx.CURRENT); err != nil {
-					return err
-				}
-			} else {
-				fmt.Println("HOOK ", hook)
-				if err := ctx.computeHook(hook); err != nil {
-					return err
-				}
+		if len(ctx.hooks) > 0 && len(hook) > 0 {
+			err := ctx.computeHook(hook)
+			if err != nil {
+				return err
 			}
 		}
+
 		r, err := Page(url+links[i], ctx)
 		if err != nil {
 			ctx.printv(os.Stderr, fmt.Sprintf("Quitted at %s which is link %d of %d total links at link recursion depth %d", links[i], i, len(links), depth), "")
@@ -364,13 +348,13 @@ func RecursiveLinkCheck(url string, links []string, ctx *Context, depth int) err
 			return err
 		}
 		if ctx.followRobots {
-			tmp, err := GetAllowedRobots(url, getPageLinksTask(node), ctx)
+			tmp, err := GetAllowedRobots(url, ctx.computeExcludedLinks(getPageLinksTask(node)), ctx)
 			if err != nil {
 				return err
 			}
 			newLinks = append(newLinks, tmp...)
 		} else {
-			newLinks = append(newLinks, getPageLinksTask(node)...)
+			newLinks = append(newLinks, ctx.computeExcludedLinks(getPageLinksTask(node))...)
 		}
 		r.Body.Close()
 		ctx.printv(os.Stdout, "Response closed", fmt.Sprintf("Response closed at depth %d", depth))
@@ -499,7 +483,7 @@ func HandleFile(args []string, s *State, ctx *Context) error {
 	instructions := s.instructionSet
 
 	// [type testHTTP verbose true followRobots true exclude hello exclude hello/world some-unrelated-tool ]
-	for i := 0; i < len(instructions)-2; i += 2 {
+	for i := 0; i < len(instructions); i += 2 {
 		current := instructions[i]
 		next := instructions[i+1]
 
@@ -521,6 +505,13 @@ func HandleFile(args []string, s *State, ctx *Context) error {
 			}
 		} else if current == "exclude" {
 			ctx.exclude = append(ctx.exclude, next)
+		} else if current == "quiet" {
+			if next == "true" {
+				ctx.quiet = true
+			}
+			if next == "false" {
+				ctx.quiet = false
+			}
 		} else if current == "url" {
 			url = next
 		}
