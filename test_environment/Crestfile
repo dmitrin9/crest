@@ -6,5 +6,4 @@ type    testHTTP
 verbose true
 exclude {toExclude}
 
-hook "/" `echo Hello`
 hook {anotherWorkingSite} `echo World`

@@ -240,9 +240,9 @@ func GetAllowedRobots(url string, links []string, ctx *Context) ([]string, error
 	return delta, nil
 }
 
-func Page(url string, ctx *Context) (*http.Response, error) {
+func Page(url string, path string, ctx *Context) (*http.Response, error) {
 	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, url+path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -254,6 +254,18 @@ func Page(url string, ctx *Context) (*http.Response, error) {
 		ctx.printv(os.Stderr, "Recieved status error", "")
 		return nil, errors.New(fmt.Sprintf("%s in %s | STATUS: %d", STATUS_ERROR, url, res.StatusCode))
 	}
+
+	if path == "" {
+		path = "/"
+	}
+	hook := ctx.hooks[path]
+	if len(ctx.hooks) > 0 && len(hook) > 0 {
+		err := ctx.computeHook(hook)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return res, nil
 }
 
@@ -286,21 +298,8 @@ func RecursiveLinkCheck(url string, links []string, ctx *Context, depth int) err
 	 * and by extension the entirety of crest.
 	 */
 	if depth == 0 {
-		firstLink := splitUrl(url)["path"]
-		if firstLink == "" {
-			firstLink = "/"
-		}
-		hook := ctx.hooks[firstLink]
-		if depth == 0 {
-			if len(ctx.hooks) > 0 && len(firstLink) > 0 {
-				err := ctx.computeHook(hook)
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		res, err := Page(url, ctx)
+		path := splitUrl(url)["path"]
+		res, err := Page(url, path, ctx)
 		if err != nil {
 			return err
 		}
@@ -328,15 +327,8 @@ func RecursiveLinkCheck(url string, links []string, ctx *Context, depth int) err
 
 	newLinks := []string{}
 	for i := range links {
-		hook := ctx.hooks[links[i]]
-		if len(ctx.hooks) > 0 && len(hook) > 0 {
-			err := ctx.computeHook(hook)
-			if err != nil {
-				return err
-			}
-		}
 
-		r, err := Page(url+links[i], ctx)
+		r, err := Page(url, links[i], ctx)
 		if err != nil {
 			ctx.printv(os.Stderr, fmt.Sprintf("Quitted at %s which is link %d of %d total links at link recursion depth %d", links[i], i, len(links), depth), "")
 			return err

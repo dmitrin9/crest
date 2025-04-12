@@ -315,7 +315,6 @@ func (s *State) Compiler() error {
 			}
 			s.hooks[path] = code
 		}
-		fmt.Println(s.hooks)
 	}
 	return nil
 }

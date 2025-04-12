@@ -65,12 +65,12 @@ func handleHtml(route string, path string) {
 }
 
 func HttpTestsiteRun(wg *sync.WaitGroup) http.Server {
-	handleHtml("/", "views/index.html")
-	handleHtml("/ActuallyExists", "views/ActuallyExists.html")
-	handleHtml("/AnotherWorkingSite", "views/AnotherWorkingSite.html")
-	handleHtml("/DoesNotExist", "views/DoesNotExist.html")
+	handleHtml("/", "test_environment/index.html")
+	handleHtml("/ActuallyExists", "test_environment/ActuallyExists.html")
+	handleHtml("/AnotherWorkingSite", "test_environment/AnotherWorkingSite.html")
+	handleHtml("/DoesNotExist", "test_environment/DoesNotExist.html")
 	http.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
-		content, err := ioutil.ReadFile("views/robots.txt")
+		content, err := ioutil.ReadFile("test_environment/robots.txt")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -119,7 +119,7 @@ func TestParse(t *testing.T) {
 	var s State
 	var err error
 
-	raw, err := os.ReadFile("views/Crestfile")
+	raw, err := os.ReadFile("test_environment/Crestfile")
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -154,7 +154,7 @@ func TestParse(t *testing.T) {
 }
 
 func TestCrestfileHandler(t *testing.T) {
-	args := []string{"crest", "run", "views/Crestfile"}
+	args := []string{"crest", "run", "test_environment/Crestfile"}
 
 	ctx := Context{
 		verbose:      false,
