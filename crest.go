@@ -74,7 +74,12 @@ func (c *Context) computeHook(hookCode string) error {
 	cmd := exec.Command(command, args...)
 	out, err := cmd.Output()
 	if err != nil {
-		return err
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			fmt.Printf("Exited with code: %d\n", exitErr.ExitCode())
+			fmt.Printf("Error output: %s\n", string(exitErr.Stderr))
+		} else {
+			fmt.Printf("Error: %v\n", err)
+		}
 	}
 
 	c.printv(os.Stdout, string(out), "")

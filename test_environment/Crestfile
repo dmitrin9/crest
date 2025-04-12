@@ -6,4 +6,4 @@ type    testHTTP
 verbose true
 exclude {toExclude}
 
-hook {anotherWorkingSite} `echo World`
+hook {anotherWorkingSite} `crest -tfv http://localhost:8080`
