@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -31,7 +30,6 @@ type Context struct {
 	verbose      bool
 	followRobots bool
 	exclude      []string
-	hooks        map[string]string
 
 	CURRENT string
 	CONTENT string
@@ -65,26 +63,6 @@ func (c *Context) computeExcludedLinks(links []string) []string {
 		}
 	}
 	return tmp
-}
-
-func (c *Context) computeHook(hookCode string) error {
-	hook := strings.Split(hookCode, " ")
-	command := hook[0]
-	args := hook[1:]
-	cmd := exec.Command(command, args...)
-	out, err := cmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			fmt.Printf("Exited with code: %d\n", exitErr.ExitCode())
-			fmt.Printf("Error output: %s\n", string(exitErr.Stderr))
-		} else {
-			fmt.Printf("Error: %v\n", err)
-		}
-	}
-
-	c.printv(os.Stdout, string(out), "")
-
-	return nil
 }
 
 func (c *Context) printv(stream io.Writer, out string, longOut string) {
@@ -245,9 +223,10 @@ func GetAllowedRobots(url string, links []string, ctx *Context) ([]string, error
 	return delta, nil
 }
 
-func Page(url string, path string, ctx *Context) (*http.Response, error) {
+func Page(host string, path string, ctx *Context) (*http.Response, error) {
+	url := host + path
 	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, url+path, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -258,17 +237,6 @@ func Page(url string, path string, ctx *Context) (*http.Response, error) {
 	if res.StatusCode != http.StatusOK {
 		ctx.printv(os.Stderr, "Recieved status error", "")
 		return nil, errors.New(fmt.Sprintf("%s in %s | STATUS: %d", STATUS_ERROR, url, res.StatusCode))
-	}
-
-	if path == "" {
-		path = "/"
-	}
-	hook := ctx.hooks[path]
-	if len(ctx.hooks) > 0 && len(hook) > 0 {
-		err := ctx.computeHook(hook)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return res, nil
@@ -295,16 +263,17 @@ func getPageLinksTask(n *html.Node) []string {
 	return links
 }
 
-func RecursiveLinkCheck(url string, links []string, ctx *Context, depth int) error {
+func RecursiveLinkCheck(host string, path string, links []string, ctx *Context, depth int) error {
 	/*
 	 * Crawl non-fragment URLs declared in anchor tags
 	 * to a depth not exceeding 20 stack frames. This
 	 * is the meat and potatoes of the --test-http flag
 	 * and by extension the entirety of crest.
 	 */
+	url := host + path
 	if depth == 0 {
-		path := splitUrl(url)["path"]
-		res, err := Page(url, path, ctx)
+		res, err := Page(host, path, ctx)
+		ctx.exclude = append(ctx.exclude, path)
 		if err != nil {
 			return err
 		}
@@ -320,7 +289,7 @@ func RecursiveLinkCheck(url string, links []string, ctx *Context, depth int) err
 		links = tmp
 
 		if ctx.followRobots {
-			tmp, err := GetAllowedRobots(url, links, ctx)
+			tmp, err := GetAllowedRobots(host, links, ctx)
 			if err != nil {
 				return err
 			}
@@ -334,6 +303,7 @@ func RecursiveLinkCheck(url string, links []string, ctx *Context, depth int) err
 	for i := range links {
 
 		r, err := Page(url, links[i], ctx)
+		ctx.exclude = append(ctx.exclude, links[i])
 		if err != nil {
 			ctx.printv(os.Stderr, fmt.Sprintf("Quitted at %s which is link %d of %d total links at link recursion depth %d", links[i], i, len(links), depth), "")
 			return err
@@ -345,7 +315,7 @@ func RecursiveLinkCheck(url string, links []string, ctx *Context, depth int) err
 			return err
 		}
 		if ctx.followRobots {
-			tmp, err := GetAllowedRobots(url, ctx.computeExcludedLinks(getPageLinksTask(node)), ctx)
+			tmp, err := GetAllowedRobots(host, ctx.computeExcludedLinks(getPageLinksTask(node)), ctx)
 			if err != nil {
 				return err
 			}
@@ -360,8 +330,7 @@ func RecursiveLinkCheck(url string, links []string, ctx *Context, depth int) err
 	if depth > 20 {
 		return nil
 	}
-
-	return RecursiveLinkCheck(url, newLinks, ctx, depth+1)
+	return RecursiveLinkCheck(host, path, newLinks, ctx, depth+1)
 
 }
 
@@ -429,6 +398,8 @@ func Handle(args []string, ctx *Context) error {
 	if test == "test-http" {
 		url := args[len(args)-1]
 		urlData := splitUrl(url)
+		host := urlData["scheme"] + "://" + urlData["hostname"] + ":" + urlData["port"]
+		path := urlData["path"]
 		if urlData["scheme"] != "http" && urlData["scheme"] != "https" {
 			return errors.New(SCHEME_REQUIRED)
 		}
@@ -438,7 +409,7 @@ func Handle(args []string, ctx *Context) error {
 		if len(urlData["port"]) == 0 {
 			return errors.New(INCLUDE_PORT)
 		}
-		if err := RecursiveLinkCheck(url, []string{}, ctx, 0); err != nil {
+		if err := RecursiveLinkCheck(host, path, []string{}, ctx, 0); err != nil {
 			return err
 		}
 		ctx.printv(os.Stdout, "Got links", "Recursive link check done")
@@ -512,12 +483,14 @@ func HandleFile(args []string, s *State, ctx *Context) error {
 		} else if current == "url" {
 			url = next
 		}
-		ctx.hooks = s.hooks
 	}
 	ctx.printv(os.Stdout, "Successfully compiled crestfile instruction set", "")
 
 	if test == "testHTTP" {
 		urlData := splitUrl(url)
+		host := urlData["scheme"] + "://" + urlData["hostname"] + ":" + urlData["port"]
+		path := urlData["path"]
+
 		if urlData["scheme"] != "http" && urlData["scheme"] != "https" {
 			return errors.New(SCHEME_REQUIRED)
 		}
@@ -527,7 +500,7 @@ func HandleFile(args []string, s *State, ctx *Context) error {
 		if len(urlData["port"]) == 0 {
 			return errors.New(INCLUDE_PORT)
 		}
-		if err := RecursiveLinkCheck(url, []string{}, ctx, 0); err != nil {
+		if err := RecursiveLinkCheck(host, path, []string{}, ctx, 0); err != nil {
 			return err
 		}
 		ctx.printv(os.Stdout, "Got links", "Recursive link check done")

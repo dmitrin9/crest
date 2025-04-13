@@ -11,7 +11,6 @@ var TOKS map[string]string = map[string]string{
 	"=":            "ASSIGNMENT",
 	"true":         "BOOL",
 	"false":        "BOOL",
-	"hook":         "HOOK",
 	"exclude":      "SET",
 	"verbose":      "SET",
 	"quiet":        "SET",
@@ -76,7 +75,6 @@ type State struct {
 	variable map[string]string
 
 	instructionSet []string
-	hooks          map[string]string
 
 	offset int
 	row    int
@@ -172,18 +170,6 @@ func (s *State) Parser() error {
 			parserNodes = append(parserNodes, node)
 			node.Clear()
 		}
-		if c.tok_type == "HOOK" {
-			node.operation = "Hook"
-			if i < len(tokens)-1 {
-				path := tokens[i+1]
-				code := tokens[i+2]
-				node.operands = []LexNode{path, code}
-			} else {
-				return s.parseError("Hook failed because hook keyword is in an invalid location", node.operation)
-			}
-			parserNodes = append(parserNodes, node)
-			node.Clear()
-		}
 		if c.tok_type == "SET" {
 			node.operation = "Set"
 			if i < len(tokens)-1 {
@@ -204,20 +190,39 @@ func (s *State) Parser() error {
 }
 
 func (s *State) compileCode(codeblock string) string {
+	var varBuf string
+	var valueBuf string
+	var insideVariable bool
+	var changeIdx int
 	re := regexp.MustCompile("\\s")
 	split := re.Split(strings.TrimSpace(codeblock), -1)
+
 	for i, c := range split {
-		if c[0] == '{' && c[len(c)-1] == '}' {
-			value := ""
-			variable := c[1 : len(c)-1]
-			if variable == "CURRENT" {
-				value = "CURRENT"
-			} else if variable == "CONTENT" {
-				value = "CONTENT"
-			} else {
-				value = s.variable[variable]
+		varBuf = ""
+		valueBuf = ""
+		insideVariable = false
+		changeIdx = -1
+		for _, d := range c {
+			if d == '{' {
+				insideVariable = true
+				continue
+			} else if d == '}' {
+				insideVariable = false
 			}
-			split[i] = value
+
+			if insideVariable == true {
+				varBuf += string(d)
+			} else if len(varBuf) > 0 {
+				variable := varBuf
+				valueBuf += s.variable[variable]
+				changeIdx = i
+				varBuf = ""
+				fmt.Println("VALUE BUFFER ", valueBuf)
+			}
+		}
+		if changeIdx != -1 {
+			split[i] = valueBuf
+			changeIdx = -1
 		}
 	}
 	code := strings.Join(split, " ")
@@ -233,7 +238,6 @@ func (s *State) Compiler() error {
 	 * in the crest.go file to generate a runtime.
 	 */
 	s.variable = make(map[string]string)
-	s.hooks = make(map[string]string)
 
 	for _, c := range s.parserNodes {
 		if c.operation == "Assignment" {
@@ -286,34 +290,6 @@ func (s *State) Compiler() error {
 			name = nameToken.tok_raw
 			s.instructionSet = append(s.instructionSet, name)
 			s.instructionSet = append(s.instructionSet, value)
-		}
-		if c.operation == "Hook" {
-			var path string
-			var code string
-
-			pathToken := c.operands[0]
-			codeToken := c.operands[1]
-
-			if pathToken.tok_type == "VARIABLE" {
-				pathTokenVariable := pathToken.tok_raw
-				pathTokenVariable = pathTokenVariable[1 : len(pathTokenVariable)-1]
-				path = s.variable[pathTokenVariable]
-			} else if pathToken.tok_type != "STRING" {
-				return s.compileError("Hook path must be type string", c.operation)
-			} else {
-				path = pathToken.tok_raw[1 : len(pathToken.tok_raw)-1]
-			}
-
-			if codeToken.tok_type == "VARIABLE" {
-				codeTokenVariable := codeToken.tok_raw
-				codeTokenVariable = s.compileCode(codeTokenVariable[1 : len(codeTokenVariable)-1])
-				code = s.variable[codeTokenVariable]
-			} else if codeToken.tok_type != "CODE" {
-				return s.compileError("Hook code must be type code", c.operation)
-			} else {
-				code = s.compileCode(codeToken.tok_raw[1 : len(codeToken.tok_raw)-1])
-			}
-			s.hooks[path] = code
 		}
 	}
 	return nil

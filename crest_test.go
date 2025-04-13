@@ -40,12 +40,6 @@ func printTheThing(arg []LexNode) {
 	}
 }
 
-func printHooks(hooks map[string]string) {
-	for key, value := range hooks {
-		fmt.Println(key, " ", value)
-	}
-}
-
 func handleHtml(route string, path string) {
 	http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.ParseFiles(path)
@@ -160,7 +154,6 @@ func TestCrestfileHandler(t *testing.T) {
 		verbose:      false,
 		quiet:        false,
 		followRobots: false,
-		hooks:        make(map[string]string),
 
 		exclude: []string{},
 	}
@@ -170,7 +163,6 @@ func TestCrestfileHandler(t *testing.T) {
 		parserNodes: []ParserNode{},
 
 		variable:       make(map[string]string),
-		hooks:          make(map[string]string),
 		instructionSet: []string{},
 
 		offset: 0,
@@ -179,23 +171,6 @@ func TestCrestfileHandler(t *testing.T) {
 	}
 
 	if err := HandleFile(args, &s, &ctx); err != nil {
-		t.Fatalf("%v", err)
-	}
-	fmt.Println("Hooks")
-	printHooks(ctx.hooks)
-}
-
-func TestUtils(t *testing.T) {
-	ctx := Context{
-		verbose:      false,
-		quiet:        false,
-		followRobots: false,
-		hooks:        make(map[string]string),
-
-		exclude: []string{},
-	}
-	err := ctx.computeHook("echo Hello")
-	if err != nil {
 		t.Fatalf("%v", err)
 	}
 }

@@ -1,9 +1,10 @@
-toExclude = "/DoesNotExist"
+urlName = "http://localhost:8080"
 anotherWorkingSite = "/AnotherWorkingSite"
 
-url     http://localhost:8080
-type    testHTTP
-verbose true
-exclude {toExclude}
+toExclude = "/DoesNotExist"
 
-hook {anotherWorkingSite} `crest -tfv http://localhost:8080`
+url          http://localhost:8080
+type         testHTTP
+verbose      true
+followRobots true
+exclude      {toExclude}
