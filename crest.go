@@ -54,11 +54,15 @@ func (c *Context) computeExcludedLinks(links []string) []string {
 	if n == 0 {
 		tmp = append(tmp, links...)
 	} else {
-		for _, exclude := range c.exclude {
-			for _, link := range links {
-				if link != exclude {
-					tmp = append(tmp, link)
+		for _, link := range links {
+			allow := true
+			for _, exclude := range c.exclude {
+				if link == exclude {
+					allow = false
 				}
+			}
+			if allow {
+				tmp = append(tmp, link)
 			}
 		}
 	}
@@ -243,7 +247,7 @@ func Page(host string, path string, ctx *Context) (*http.Response, error) {
 }
 
 func getPageLinksTask(n *html.Node) []string {
-	var links []string
+	var pageLinks []string
 
 	for c := range n.Descendants() {
 		var linkBuffer []string
@@ -258,9 +262,9 @@ func getPageLinksTask(n *html.Node) []string {
 				}
 			}
 		}
-		links = append(links, linkBuffer...)
+		pageLinks = append(pageLinks, linkBuffer...)
 	}
-	return links
+	return pageLinks
 }
 
 func RecursiveLinkCheck(host string, path string, links []string, ctx *Context, depth int) error {
@@ -272,38 +276,13 @@ func RecursiveLinkCheck(host string, path string, links []string, ctx *Context, 
 	 */
 	url := host + path
 	if depth == 0 {
-		res, err := Page(host, path, ctx)
-		ctx.exclude = append(ctx.exclude, path)
-		if err != nil {
-			return err
-		}
-		ctx.printv(os.Stdout, "Created base response for "+url, "")
-		node, err := html.Parse(res.Body)
-		if err != nil {
-			return err
-		}
-		ctx.printv(os.Stdout, "Got HTML nodes", "")
-
-		links = getPageLinksTask(node)
-		tmp := ctx.computeExcludedLinks(links)
-		links = tmp
-
-		if ctx.followRobots {
-			tmp, err := GetAllowedRobots(host, links, ctx)
-			if err != nil {
-				return err
-			}
-			links = tmp
-		}
-		ctx.printv(os.Stdout, "Closing base page response closure", "Closing base page response closure for "+url)
-		res.Body.Close()
+		links = append(links, path)
 	}
 
+	linkLength := len(links)
 	newLinks := []string{}
-	for i := range links {
-
+	for i := range linkLength {
 		r, err := Page(url, links[i], ctx)
-		ctx.exclude = append(ctx.exclude, links[i])
 		if err != nil {
 			ctx.printv(os.Stderr, fmt.Sprintf("Quitted at %s which is link %d of %d total links at link recursion depth %d", links[i], i, len(links), depth), "")
 			return err
@@ -315,23 +294,27 @@ func RecursiveLinkCheck(host string, path string, links []string, ctx *Context, 
 			return err
 		}
 		if ctx.followRobots {
-			tmp, err := GetAllowedRobots(host, ctx.computeExcludedLinks(getPageLinksTask(node)), ctx)
+			accountForRobots, err := GetAllowedRobots(url, getPageLinksTask(node), ctx)
 			if err != nil {
 				return err
 			}
+
+			tmp := ctx.computeExcludedLinks(accountForRobots)
+
 			newLinks = append(newLinks, tmp...)
 		} else {
 			newLinks = append(newLinks, ctx.computeExcludedLinks(getPageLinksTask(node))...)
 		}
+		ctx.exclude = append(ctx.exclude, links[i])
 		r.Body.Close()
 		ctx.printv(os.Stdout, "Response closed", fmt.Sprintf("Response closed at depth %d", depth))
 	}
 
-	if depth > 20 {
-		return nil
+	if depth < 20 {
+		return RecursiveLinkCheck(host, path, newLinks, ctx, depth+1)
 	}
-	return RecursiveLinkCheck(host, path, newLinks, ctx, depth+1)
 
+	return nil
 }
 
 func Handle(args []string, ctx *Context) error {

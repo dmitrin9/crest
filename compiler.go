@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strings"
 )
 
 var TOKS map[string]string = map[string]string{
@@ -133,8 +132,6 @@ func (s *State) Lexer() error {
 
 		if rawToken[0] == '"' && rawToken[len(rawToken)-1] == '"' {
 			token = newLexnode(rawToken, "STRING")
-		} else if rawToken[0] == '`' && rawToken[len(rawToken)-1] == '`' {
-			token = newLexnode(rawToken, "CODE")
 		} else if rawToken[0] == '{' && rawToken[len(rawToken)-1] == '}' {
 			token = newLexnode(rawToken, "VARIABLE")
 		} else if len(TOKS[rawToken]) > 0 {
@@ -189,51 +186,10 @@ func (s *State) Parser() error {
 	return nil
 }
 
-func (s *State) compileCode(codeblock string) string {
-	var varBuf string
-	var valueBuf string
-	var insideVariable bool
-	var changeIdx int
-	re := regexp.MustCompile("\\s")
-	split := re.Split(strings.TrimSpace(codeblock), -1)
-
-	for i, c := range split {
-		varBuf = ""
-		valueBuf = ""
-		insideVariable = false
-		changeIdx = -1
-		for _, d := range c {
-			if d == '{' {
-				insideVariable = true
-				continue
-			} else if d == '}' {
-				insideVariable = false
-			}
-
-			if insideVariable == true {
-				varBuf += string(d)
-			} else if len(varBuf) > 0 {
-				variable := varBuf
-				valueBuf += s.variable[variable]
-				changeIdx = i
-				varBuf = ""
-				fmt.Println("VALUE BUFFER ", valueBuf)
-			}
-		}
-		if changeIdx != -1 {
-			split[i] = valueBuf
-			changeIdx = -1
-		}
-	}
-	code := strings.Join(split, " ")
-	return code
-}
-
 func (s *State) Compiler() error {
 	/*
 	 * Compiles the parse nodes to a simple instruction set
-	 * 		( this also invovles substituting variable names
-	 *        and simplifying code blocks )
+	 * 		( this also invovles substituting variable names )
 	 * which can be further interpreted by a function
 	 * in the crest.go file to generate a runtime.
 	 */
@@ -280,8 +236,6 @@ func (s *State) Compiler() error {
 					return s.compileError("Variable not found", c.operation)
 				}
 				value = variableValue
-			} else if valueToken.tok_type == "CODE" {
-				value = s.compileCode(valueToken.tok_raw[1 : len(valueToken.tok_raw)-1])
 			} else if valueToken.tok_type == "STRING" {
 				value = valueToken.tok_raw[1 : len(valueToken.tok_raw)-1]
 			} else {

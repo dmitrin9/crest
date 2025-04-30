@@ -85,30 +85,45 @@ func HttpTestsiteRun(wg *sync.WaitGroup) http.Server {
 	return srv
 }
 
-// Just some basic happy tests, which works for now. I will add more comprehensive tests in the future.
-func TestHttpCrawlingFlags(t *testing.T) {
+// Initialize testing server.
+func TestInit(t *testing.T) {
 	var wg sync.WaitGroup
-	var ctx Context
-	var err error
-
 	srv := HttpTestsiteRun(&wg)
-
-	args := []string{"crest", "-tfv", "http://localhost:8080"}
-	err = Handle(args, &ctx)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	args = []string{"crest", "-tv", "http://localhost:8080"}
-	err = Handle(args, &ctx)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	srv.Close()
+	defer srv.Close()
 	wg.Wait()
 }
 
+// Testing minimal flags.
+// Since an error when crawling some paths is expected, it will not throw.
+// An error will only throw if the paths that are supposed to fail are
+// crawled successfully if that makes sense.
+func TestHttpCrawlingMinimalFlags(t *testing.T) {
+	var ctx Context
+	var err error
+	var args []string
+
+	args = []string{"crest", "-tv", "http://localhost:8080"}
+	err = Handle(args, &ctx)
+	if err == nil {
+		t.Fatalf("%v", err)
+	}
+
+}
+
+// Happy testing to test maximum flags.
+func TestHttpCrawlingAllFlags(t *testing.T) {
+	var ctx Context
+	var err error
+	var args []string
+
+	args = []string{"crest", "-tfv", "http://localhost:8080"}
+	err = Handle(args, &ctx)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+// Test crestfile parser/ir-compiler.
 func TestParse(t *testing.T) {
 	var s State
 	var err error
@@ -147,6 +162,7 @@ func TestParse(t *testing.T) {
 
 }
 
+// Test crestfile handler.
 func TestCrestfileHandler(t *testing.T) {
 	args := []string{"crest", "run", "test_environment/Crestfile"}
 

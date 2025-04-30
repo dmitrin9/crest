@@ -10,10 +10,11 @@ import (
 func getHelpString() string {
 	helpString := ""
 	helpString += "run                Run a Crestfile.\n"
+	helpString += "help               Generate this message again.\n"
 	helpString += "-t/--test-http     Test http mode.\n"
 	helpString += "-v/--verbose       Print in verbose mode.\n"
 	helpString += "-q/--quiet         Print in quiet mode.\n"
-	helpString += "-f/--follow-robots Follow robots.txt.\n"
+	helpString += "-f/--follow-robots Follow robots.txt."
 	return helpString
 }
 
@@ -51,6 +52,8 @@ func main() {
 			}
 		} else if args[1] == "run" {
 			fmt.Fprintln(os.Stderr, "It seems like you inputted an invalid path for your Crestfile.")
+		} else if args[1] == "help" {
+			fmt.Fprintln(os.Stderr, getHelpString())
 		} else {
 			if err := Handle(args, &ctx); err != nil {
 				log.Fatal(err)
