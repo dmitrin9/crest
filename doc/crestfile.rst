@@ -16,7 +16,19 @@ How to write a crestfile ::
     type         testHTTP
     followRobots true
     verbose      true
-    exclude {foo}
+    depth        2
+    exclude {excludeSomething}
+
+Explanation of the above file:
+==============================
+
+excludeSomething    This is a string variable, the link in it will be excluded.
+url                 keyword ``url`` is required. It defines which url will be crawled.
+type                keyword ``type`` is required. It defines how you wanna test your website.
+followRobots        setting this to true will obey the robots.txt policy of your website.
+verbose             setting this to true will print everything happening. There is also a ``quiet`` keyword that will print in quiet mode.
+depth               depth allows you to define to what depth you want to crawl.
+exclude             exclude will allow you to exclude a specific path from being crawled.
 
 Notes
 =====
@@ -24,3 +36,5 @@ Notes
 Crestfiles do not support single quotes for string literals.
 
 Variables are used by wrapping the variable name in curly braces.
+
+The difference between verbose and quiet mode: Verbose mode will print everything that is happening at each stage of the test. Quiet mode will only print errors. Crest will by default print in an inbetween state where it prints messages but not detailed ones.
