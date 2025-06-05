@@ -170,6 +170,7 @@ func TestCrestfileHandler(t *testing.T) {
 		verbose:      false,
 		quiet:        false,
 		followRobots: false,
+		depth:        20,
 
 		exclude: []string{},
 	}

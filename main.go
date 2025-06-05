@@ -29,6 +29,7 @@ func main() {
 		verbose:      false,
 		quiet:        false,
 		followRobots: false,
+		depth:        20,
 
 		exclude: []string{},
 	}

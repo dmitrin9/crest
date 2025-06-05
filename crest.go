@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -30,9 +31,10 @@ type Context struct {
 	verbose      bool
 	followRobots bool
 	exclude      []string
+	depth        int
 
-	CURRENT string
-	CONTENT string
+	// CURRENT string
+	// CONTENT string
 }
 
 type RobotPolicy struct {
@@ -310,7 +312,7 @@ func RecursiveLinkCheck(host string, path string, links []string, ctx *Context, 
 		ctx.printv(os.Stdout, "Response closed", fmt.Sprintf("Response closed at depth %d", depth))
 	}
 
-	if depth < 20 {
+	if depth < ctx.depth {
 		return RecursiveLinkCheck(host, path, newLinks, ctx, depth+1)
 	}
 
@@ -465,6 +467,14 @@ func HandleFile(args []string, s *State, ctx *Context) error {
 			}
 		} else if current == "url" {
 			url = next
+		} else if current == "depth" {
+			num, err := strconv.Atoi(next)
+			if err != nil {
+				return err
+			}
+			if num > 0 {
+				ctx.depth = num
+			}
 		}
 	}
 	ctx.printv(os.Stdout, "Successfully compiled crestfile instruction set", "")

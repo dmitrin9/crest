@@ -15,6 +15,7 @@ var TOKS map[string]string = map[string]string{
 	"quiet":        "SET",
 	"followRobots": "SET",
 	"type":         "SET",
+	"depth":        "SET",
 	"url":          "SET",
 	"testHTTP":     "TEST_TYPE",
 }
